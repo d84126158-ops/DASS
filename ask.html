@@ -18,6 +18,10 @@
     <button id="testBtn" type="button" style="padding:6px 14px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--text);cursor:pointer;font:inherit">測試連線</button>
     <pre id="testOut" style="margin:12px 0 0;white-space:pre-wrap;word-break:break-all"></pre>
   </div>
+  <div class="card">
+    <button id="geminiBtn" type="button" style="padding:6px 14px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--text);cursor:pointer;font:inherit">測試 Gemini</button>
+    <pre id="geminiOut" style="margin:12px 0 0;white-space:pre-wrap;word-break:break-word"></pre>
+  </div>
 </main>
 <footer class="site-footer">
   <span>組別：＿＿＿</span><span>組員：＿＿＿、＿＿＿、＿＿＿</span>
@@ -50,6 +54,35 @@
       out.textContent = "失敗：無法連線到後端（" + e.message + "）。";
     } finally {
       btn.disabled = false;
+    }
+  });
+
+  const gBtn = document.getElementById("geminiBtn");
+  const gOut = document.getElementById("geminiOut");
+
+  gBtn.addEventListener("click", async () => {
+    gBtn.disabled = true;
+    gOut.textContent = "Gemini 回覆中…";
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "ask", question: "請用一句話自我介紹" })
+      });
+      let data = null;
+      try { data = await res.json(); } catch (e) {}
+      if (!res.ok) {
+        const msg = data && data.error ? data.error : "伺服器回應異常";
+        gOut.textContent = "失敗（狀態碼 " + res.status + "）：" + msg;
+      } else if (data === null || typeof data.answer !== "string") {
+        gOut.textContent = "失敗：伺服器回傳的內容格式不正確。";
+      } else {
+        gOut.textContent = data.answer;
+      }
+    } catch (e) {
+      gOut.textContent = "失敗：無法連線到後端（" + e.message + "）。";
+    } finally {
+      gBtn.disabled = false;
     }
   });
 </script>
