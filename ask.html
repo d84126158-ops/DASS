@@ -14,10 +14,44 @@
 <main class="wrap">
   <h1>問答</h1>
   <div class="card coming"><b>即將推出</b>這個功能正在準備中，敬請期待。</div>
+  <div class="card">
+    <button id="testBtn" type="button" style="padding:6px 14px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--text);cursor:pointer;font:inherit">測試連線</button>
+    <pre id="testOut" style="margin:12px 0 0;white-space:pre-wrap;word-break:break-all"></pre>
+  </div>
 </main>
 <footer class="site-footer">
   <span>組別：＿＿＿</span><span>組員：＿＿＿、＿＿＿、＿＿＿</span>
 </footer>
+<script>
+  const API_URL = "https://dass.d84126158.workers.dev/";
+  const btn = document.getElementById("testBtn");
+  const out = document.getElementById("testOut");
 
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    out.textContent = "連線中…";
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "test" })
+      });
+      let data = null;
+      try { data = await res.json(); } catch (e) {}
+      if (!res.ok) {
+        const msg = data && data.error ? data.error : "伺服器回應異常";
+        out.textContent = "失敗（狀態碼 " + res.status + "）：" + msg;
+      } else if (data === null) {
+        out.textContent = "失敗：伺服器回傳的內容不是 JSON。";
+      } else {
+        out.textContent = JSON.stringify(data);
+      }
+    } catch (e) {
+      out.textContent = "失敗：無法連線到後端（" + e.message + "）。";
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>
 </body>
 </html>
