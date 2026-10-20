@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>婚姻狀態與憂鬱、焦慮、壓力的關係</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="site-nav"><div class="inner">
+    <span class="brand">婚姻狀態與 DASS</span>
+    <a href="index.html" class="active" aria-current="page">首頁</a><a href="results.html">研究結果</a><a href="ask.html">問答</a><a href="about.html">關於研究</a>
+  </div></nav>
+<main class="wrap">
+  <h1>婚姻狀態與憂鬱、焦慮、壓力的關係</h1>
+  <p class="intro">本研究使用網路版 DASS-42 問卷的公開回答資料（2017–2019 年蒐集），比較未婚、已婚、曾婚三組在憂鬱、焦慮與壓力分量表上的平均分數與嚴重度分布。</p>
+
+  <div class="stats">
+    <div class="stat"><div class="num" id="total">—</div><div class="lab">分析樣本總人數</div></div>
+    <div class="stat"><div class="num">21.24 vs 15.00</div><div class="lab">憂鬱平均（未婚 vs 已婚，0–42 分）</div></div>
+    <div class="stat"><div class="num" id="ext">—</div><div class="lab">未婚組憂鬱達極重度的比例</div></div>
+  </div>
+
+  <div class="links">
+    <a href="results.html"><b>研究結果 →</b><span>互動圖表與統計表格</span></a>
+    <a href="ask.html"><b>問答 →</b><span>即將推出</span></a>
+    <a href="about.html"><b>關於研究 →</b><span>資料來源、方法與限制</span></a>
+  </div>
+</main>
+<footer class="site-footer">
+  <span>組別：＿＿＿</span><span>組員：＿＿＿、＿＿＿、＿＿＿</span>
+</footer>
+<script>
+  // 數字由資料計算：三組人數加總、未婚組憂鬱極重度比例
+  const N = [3604, 455, 100];
+  document.getElementById("total").textContent = N.reduce((a,b)=>a+b,0).toLocaleString("en-US");
+  document.getElementById("ext").textContent = (0.3448945616*100).toFixed(1) + "%";
+</script>
+</body>
+</html>

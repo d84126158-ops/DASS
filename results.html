@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>研究結果｜婚姻狀態與憂鬱、焦慮、壓力</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="site-nav"><div class="inner">
+    <span class="brand">婚姻狀態與 DASS</span>
+    <a href="index.html">首頁</a><a href="results.html" class="active" aria-current="page">研究結果</a><a href="ask.html">問答</a><a href="about.html">關於研究</a>
+  </div></nav>
+<main class="wrap">
+  <h1>婚姻狀態與憂鬱、焦慮、壓力的關係</h1>
+  <p class="intro">DASS-42 共 42 題，分為憂鬱、焦慮、壓力三個分量表（各 14 題），每題以 0–3 分計分（原始 1–4 分減 1），分量表加總後得 0–42 分，分數愈高表示症狀愈嚴重。</p>
+
+  <div class="card">
+    <div class="controls">
+      <div class="tabs">
+        <button id="tab1" class="active">各分量表平均數</button>
+        <button id="tab2">嚴重度分布</button>
+      </div>
+      <div id="sel1"></div>
+      <div id="sel2" style="display:none"></div>
+    </div>
+    <div id="chart"></div>
+  </div>
+
+  <div class="card">
+    <table id="tbl"></table>
+    <div class="note" id="note"></div>
+  </div>
+</main>
+<footer class="site-footer">
+  <span>組別：＿＿＿</span><span>組員：＿＿＿、＿＿＿、＿＿＿</span>
+</footer>
+<div id="tip"></div>
+<script>
+// ===== 資料 =====
+const GROUPS = [
+  {code:1, name:"未婚", n:3604, m:{dep:21.24278579, anx:16.39150943, str:21.29189789},
+                                 sd:{dep:12.08886242, anx:10.0725178,  str:10.34480383}},
+  {code:2, name:"已婚", n:455,  m:{dep:15.0021978,  anx:10.64835165, str:17.93186813},
+                                 sd:{dep:11.61354573, anx:8.949409483, str:10.68315071}},
+  {code:3, name:"曾婚", n:100,  m:{dep:17.4,         anx:11.65,       str:18.67},
+                                 sd:{dep:12.50212103, anx:9.23254564, str:10.44954689}}
+];
+const SUBS = [
+  {key:"dep", name:"憂鬱", color:"#d1495b"},
+  {key:"anx", name:"焦慮", color:"#2a6fdb"},
+  {key:"str", name:"壓力", color:"#2e9c6a"}
+];
+const LEVELS = ["正常","輕度","中度","重度","極重度"];
+const LEVEL_COLORS = ["#9ecae1","#fdd49e","#fdae6b","#e6550d","#a50f15"];
+
+// 嚴重度比例（占各婚姻狀態人數；順序：正常、輕度、中度、重度、極重度）
+// 鍵為婚姻狀態編碼 1=未婚、2=已婚、3=曾婚
+const SEVERITY = {
+  dep: {1:[0.2100443951,0.09378468368,0.1867369589,0.1645394007,0.3448945616],
+        2:[0.4087912088,0.1054945055,0.1912087912,0.1230769231,0.1714285714],
+        3:[0.38,0.08,0.14,0.16,0.24]},
+  anx: {1:[0.2272475028,0.07103218646,0.1845172031,0.1545504994,0.3626526082],
+        2:[0.4659340659,0.08351648352,0.178021978,0.09450549451,0.178021978],
+        3:[0.37,0.11,0.22,0.11,0.19]},
+  str: {1:[0.288845727,0.1243063263,0.2269700333,0.2125416204,0.147336293],
+        2:[0.4307692308,0.1208791209,0.189010989,0.1604395604,0.0989010989],
+        3:[0.37,0.14,0.21,0.21,0.07]}
+};
+
+// ===== 狀態 =====
+let mode = 1;
+let checked = new Set(["dep","anx","str"]);
+let radio = "dep";
+const $ = id => document.getElementById(id);
+const tip = $("tip");
+const fmt = x => x.toFixed(2);
+const label = g => `${g.name}（n=${g.n}）`;
+const ci = (g,k) => 1.96 * g.sd[k] / Math.sqrt(g.n);
+const subName = k => SUBS.find(s=>s.key===k).name;
+
+function showTip(e, html) {
+  tip.innerHTML = html; tip.style.display = "block";
+  tip.style.left = (e.clientX + 14) + "px"; tip.style.top = (e.clientY + 14) + "px";
+}
+function hideTip() { tip.style.display = "none"; }
+
+// ===== 控制項 =====
+function buildControls() {
+  $("sel1").innerHTML = SUBS.map(s =>
+    `<label><input type="checkbox" data-k="${s.key}" checked> ${s.name}</label>`).join("");
+  $("sel2").innerHTML = SUBS.map(s =>
+    `<label><input type="radio" name="sub" data-k="${s.key}" ${s.key===radio?"checked":""}> ${s.name}</label>`).join("");
+  $("sel1").querySelectorAll("input").forEach(cb => cb.onchange = () => {
+    if (cb.checked) checked.add(cb.dataset.k);
+    else if (checked.size > 1) checked.delete(cb.dataset.k);
+    else cb.checked = true;   // 至少保留一個
+    render();
+  });
+  $("sel2").querySelectorAll("input").forEach(r => r.onchange = () => { radio = r.dataset.k; render(); });
+  $("tab1").onclick = () => { mode = 1; render(); };
+  $("tab2").onclick = () => { mode = 2; render(); };
+}
+
+// ===== 圖表一：折線圖 + 95% CI =====
+function drawLine() {
+  const W=800, H=420, L=60, R=30, T=20, B=60;
+  const pw=W-L-R, ph=H-T-B;
+  const x = i => L + pw*(i+0.5)/GROUPS.length;
+  const y = v => T + ph*(1 - v/42);
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%">`;
+  for (let v=0; v<=42; v+=6) {
+    s += `<line class="grid" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/>
+          <text x="${L-8}" y="${y(v)+4}" text-anchor="end">${v}</text>`;
+  }
+  s += `<text transform="translate(16 ${T+ph/2}) rotate(-90)" text-anchor="middle">分量表總分（0–42）</text>`;
+  GROUPS.forEach((g,i) => s += `<text x="${x(i)}" y="${H-B+24}" text-anchor="middle">${label(g)}</text>`);
+  SUBS.filter(sb=>checked.has(sb.key)).forEach((sb,si,arr) => {
+    const off = (si-(arr.length-1)/2)*10;   // 小幅水平位移避免誤差線重疊
+    const pts = GROUPS.map((g,i)=>`${x(i)+off},${y(g.m[sb.key])}`).join(" ");
+    s += `<polyline points="${pts}" fill="none" stroke="${sb.color}" stroke-width="2"/>`;
+    GROUPS.forEach((g,i) => {
+      const cx=x(i)+off, c=ci(g,sb.key), lo=Math.max(0,g.m[sb.key]-c), hi=Math.min(42,g.m[sb.key]+c);
+      s += `<g stroke="${sb.color}" stroke-width="1.5">
+              <line x1="${cx}" x2="${cx}" y1="${y(lo)}" y2="${y(hi)}"/>
+              <line x1="${cx-5}" x2="${cx+5}" y1="${y(lo)}" y2="${y(lo)}"/>
+              <line x1="${cx-5}" x2="${cx+5}" y1="${y(hi)}" y2="${y(hi)}"/></g>
+            <circle cx="${cx}" cy="${y(g.m[sb.key])}" r="6" fill="${sb.color}" stroke="#fff" stroke-width="1.5"
+              data-g="${i}" data-k="${sb.key}" style="cursor:pointer"/>`;
+    });
+  });
+  // 圖例
+  SUBS.filter(sb=>checked.has(sb.key)).forEach((sb,i) => {
+    s += `<line x1="${L+10+i*80}" x2="${L+30+i*80}" y1="${T+8}" y2="${T+8}" stroke="${sb.color}" stroke-width="3"/>
+          <text x="${L+36+i*80}" y="${T+12}">${sb.name}</text>`;
+  });
+  s += `</svg>`;
+  $("chart").innerHTML = s;
+  $("chart").querySelectorAll("circle").forEach(c => {
+    const g = GROUPS[c.dataset.g], k = c.dataset.k;
+    c.onmousemove = e => showTip(e, `${subName(k)}｜${g.name}<br>平均數：${fmt(g.m[k])}<br>標準差：${fmt(g.sd[k])}`);
+    c.onmouseleave = hideTip;
+  });
+}
+
+// ===== 圖表二：橫向堆疊長條圖 =====
+function drawStack() {
+  const data = SEVERITY[radio];
+  if (!data) {
+    $("chart").innerHTML = `<div class="empty">尚未填入「${subName(radio)}」的嚴重度人數。<br>請在檔案開頭的 SEVERITY 區塊填入各婚姻狀態的五級比例。</div>`;
+    return;
+  }
+  const W=800, rowH=70, L=130, R=30, T=20, B=50, H=T+B+rowH*GROUPS.length;
+  const pw=W-L-R;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%">`;
+  for (let p=0; p<=100; p+=20) {
+    const xx = L + pw*p/100;
+    s += `<line class="grid" x1="${xx}" x2="${xx}" y1="${T}" y2="${H-B}"/>
+          <text x="${xx}" y="${H-B+18}" text-anchor="middle">${p}%</text>`;
+  }
+  s += `<text x="${L+pw/2}" y="${H-6}" text-anchor="middle">百分比</text>`;
+  GROUPS.forEach((g,i) => {
+    const row = data[g.code], tot = row.reduce((a,b)=>a+b,0);
+    const yy = T + i*rowH + 10;
+    s += `<text x="${L-8}" y="${yy+rowH/2-6}" text-anchor="end">${label(g)}</text>`;
+    let acc = 0;
+    row.forEach((c,j) => {
+      const pct = tot ? c/tot*100 : 0, w = pw*pct/100;
+      s += `<rect x="${L+pw*acc/100}" y="${yy}" width="${w}" height="${rowH-30}" fill="${LEVEL_COLORS[j]}"
+              data-name="${LEVELS[j]}" data-pct="${pct.toFixed(1)}"/>`;
+      acc += pct;
+    });
+  });
+  LEVELS.forEach((l,j) => {
+    s += `<rect x="${L+j*90}" y="0" width="12" height="12" fill="${LEVEL_COLORS[j]}"/>
+          <text x="${L+j*90+16}" y="11">${l}</text>`;
+  });
+  s += `</svg>`;
+  $("chart").innerHTML = s;
+  $("chart").querySelectorAll("rect[data-name]").forEach(r => {
+    r.onmousemove = e => showTip(e, `${r.dataset.name}：${r.dataset.pct}%`);
+    r.onmouseleave = hideTip;
+  });
+}
+
+// ===== 表格與註解 =====
+let sort = {col:-1, dir:1};   // col=-1 表示維持原順序
+function drawTable() {
+  let heads, rows, note;
+  if (mode === 1) {
+    const ks = SUBS.filter(s=>checked.has(s.key));
+    heads = ["編碼","婚姻狀態","人數"];
+    ks.forEach(s => heads.push(s.name+"平均", s.name+"SD", s.name+"95% CI"));
+    rows = GROUPS.map(g => {
+      const r = [{t:g.code,v:g.code},{t:g.name,v:g.code},{t:g.n,v:g.n}];
+      ks.forEach(s => {
+        const c = ci(g,s.key), m = g.m[s.key];
+        r.push({t:fmt(m),v:m},{t:fmt(g.sd[s.key]),v:g.sd[s.key]},{t:fmt(m-c)+"–"+fmt(m+c),v:m-c});
+      });
+      return r;
+    });
+    note = `<ul>
+      <li><b>平均數</b>：該婚姻狀態組在分量表總分（0–42）的平均，分數愈高症狀愈重。</li>
+      <li><b>SD（標準差）</b>：組內個別分數的離散程度，不是平均數的誤差。</li>
+      <li><b>95% CI</b>：以 平均數 ± 1.96 × SD ÷ √n 估計；曾婚組人數較少，區間較寬。</li>
+      <li><b>排序</b>：點擊表頭可由小到大、再點由大到小，第三次點擊恢復原順序；95% CI 欄以區間下限排序。</li>
+      <li><b>注意</b>：這是相關描述，不代表婚姻狀態造成差異；各組人數懸殊（未婚遠多於其他組），且樣本為自願網路填答，不能推論到一般人口。圖中未控制年齡等變項，且未做顯著性檢定。</li></ul>`;
+  } else {
+    const data = SEVERITY[radio];
+    heads = ["編碼","婚姻狀態","人數"].concat(LEVELS);
+    rows = GROUPS.map(g => {
+      const r = [{t:g.code,v:g.code},{t:g.name,v:g.code},{t:g.n,v:g.n}];
+      const row = data[g.code], tot = row.reduce((a,b)=>a+b,0);
+      row.forEach(c => r.push({t:(c/tot*100).toFixed(1)+"%", v:c/tot}));
+      return r;
+    });
+    note = `<ul>
+      <li><b>百分比</b>：該婚姻狀態組中落在各嚴重度等級的比例，各列加總為 100%。</li>
+      <li><b>分級切點（分量表總分）</b>：憂鬱 0–9／10–13／14–20／21–27／28+；焦慮 0–7／8–9／10–14／15–19／20+；壓力 0–14／15–18／19–25／26–33／34+（依序為正常、輕度、中度、重度、極重度）。</li>
+      <li><b>注意</b>：百分比以各組自身人數為分母，可比較組間結構，但曾婚組人數少，百分比較不穩定。分級依所採用的切點而定，且僅為篩檢參考，不等於臨床診斷。</li></ul>`;
+  }
+  if (sort.col >= heads.length) sort = {col:-1, dir:1};
+  if (sort.col >= 0) rows.sort((x,y) => (x[sort.col].v - y[sort.col].v) * sort.dir);
+  const arrow = i => sort.col===i ? (sort.dir===1 ? " ▲" : " ▼") : " ⇅";
+  $("tbl").innerHTML = "<tr>" + heads.map((h,i)=>`<th data-c="${i}" style="cursor:pointer;user-select:none" title="點擊排序">${h}${arrow(i)}</th>`).join("") + "</tr>" +
+    rows.map(r => "<tr>" + r.map(c=>`<td>${c.t}</td>`).join("") + "</tr>").join("");
+  $("tbl").querySelectorAll("th").forEach(th => th.onclick = () => {
+    const c = +th.dataset.c;
+    if (sort.col === c) { if (sort.dir === 1) sort.dir = -1; else sort = {col:-1, dir:1}; }
+    else sort = {col:c, dir:1};
+    drawTable();
+  });
+  $("note").innerHTML = note;
+}
+
+function render() {
+  $("tab1").classList.toggle("active", mode===1);
+  $("tab2").classList.toggle("active", mode===2);
+  $("sel1").style.display = mode===1 ? "" : "none";
+  $("sel2").style.display = mode===2 ? "" : "none";
+  hideTip();
+  mode===1 ? drawLine() : drawStack();
+  drawTable();
+}
+buildControls();
+render();
+</script>
+</body>
+</html>
